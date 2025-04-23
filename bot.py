@@ -1,14 +1,22 @@
 import os
+import datetime
 from pyrogram import Client, filters
 from pyrogram.types import ReplyKeyboardMarkup
+import asyncio
 
-# Берём данные из переменных окружения
+# ==== Настройки ====
+SLEEP_START = 22  # с 22:00
+SLEEP_END = 8     # до 08:00
+NIGHT_LOG_FILE = "night_contacts.txt"
+
+# ==== Данные авторизации ====
 api_id = int(os.environ.get("API_ID"))
 api_hash = os.environ.get("API_HASH")
 bot_token = os.environ.get("BOT_TOKEN")
 
 app = Client("nedvizh247_bot", api_id=api_id, api_hash=api_hash, bot_token=bot_token)
 
+# Главное меню
 main_menu = ReplyKeyboardMarkup(
     keyboard=[
         ["🏠 Хочу купить", "📤 Хочу продать"]
@@ -17,20 +25,77 @@ main_menu = ReplyKeyboardMarkup(
     one_time_keyboard=True
 )
 
+# ==== Проверка, ночь ли сейчас ====
+def is_night_time():
+    now = datetime.datetime.now().time()
+    return now.hour >= SLEEP_START or now.hour < SLEEP_END
+
+# ==== Логирование ночного пользователя ====
+def log_night_user(user):
+    if not user:
+        return
+    user_id = user.id
+    username = user.username or "нет username"
+    name = user.first_name or "без имени"
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    line = f"{user_id} | @{username} | {name} | {now} | reminder_sent: False\n"
+
+    # Проверка: если уже есть такой ID — не записывать снова
+    if os.path.exists(NIGHT_LOG_FILE):
+        with open(NIGHT_LOG_FILE, "r", encoding="utf-8") as file:
+            if str(user_id) in file.read():
+                return
+
+    with open(NIGHT_LOG_FILE, "a", encoding="utf-8") as file:
+        file.write(line)
+
+# ==== Утреннее напоминание ====
+async def send_reminders():
+    if not os.path.exists(NIGHT_LOG_FILE):
+        return
+    updated_lines = []
+    async with app:
+        with open(NIGHT_LOG_FILE, "r", encoding="utf-8") as file:
+            for line in file.readlines():
+                if "reminder_sent: False" in line:
+                    try:
+                        user_id = int(line.split("|")[0].strip())
+                        await app.send_message(user_id, "🌞 Доброе утро! Вы писали нам ночью. Готовы продолжить?")
+                        line = line.replace("reminder_sent: False", "reminder_sent: True")
+                    except Exception as e:
+                        print(f"Не удалось отправить напоминание пользователю {user_id}: {e}")
+                updated_lines.append(line)
+        with open(NIGHT_LOG_FILE, "w", encoding="utf-8") as file:
+            file.writelines(updated_lines)
+
+# ==== Планировщик запуска утреннего напоминания (один раз при старте) ====
 @app.on_message(filters.command("start"))
 async def start(client, message):
-    await message.reply(
-        "👋 Добро пожаловать в бот 'Недвижимость 24/7'!\n\n"
-        "Выберите, что вы хотите сделать:",
-        reply_markup=main_menu
-    )
+    await send_reminders()
+    if is_night_time():
+        log_night_user(message.from_user)
+        await message.reply("🌙 Бот сейчас спит. Пожалуйста, напишите с 08:00 до 22:00. Спасибо!")
+    else:
+        await message.reply(
+            "👋 Добро пожаловать в бот 'Недвижимость 24/7'!\n\n"
+            "Выберите, что вы хотите сделать:",
+            reply_markup=main_menu
+        )
 
 @app.on_message(filters.regex("Хочу купить"))
 async def handle_buy(client, message):
-    await message.reply("🛒 Отлично! Сейчас подберём вам недвижимость...\n(в будущем добавим фильтры)")
+    if is_night_time():
+        log_night_user(message.from_user)
+        await message.reply("🌙 Бот сейчас спит. Пожалуйста, напишите с 08:00 до 22:00. Спасибо!")
+    else:
+        await message.reply("🛒 Отлично! Сейчас подберём вам недвижимость...\n(в дальнейшем будет фильтрация по параметрам)")
 
 @app.on_message(filters.regex("Хочу продать"))
 async def handle_sell(client, message):
-    await message.reply("📋 Отлично! Сейчас оформим вашу заявку на продажу...\n(в будущем — сбор параметров)")
+    if is_night_time():
+        log_night_user(message.from_user)
+        await message.reply("🌙 Бот сейчас спит. Пожалуйста, напишите с 08:00 до 22:00. Спасибо!")
+    else:
+        await message.reply("📋 Отлично! Сейчас оформим вашу заявку на продажу...\n(в дальнейшем — сбор параметров)")
 
 app.run()
