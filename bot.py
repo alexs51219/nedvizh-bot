@@ -1,22 +1,30 @@
 import os
 import datetime
+import threading
+from http.server import SimpleHTTPRequestHandler, HTTPServer
 from pyrogram import Client, filters
 from pyrogram.types import ReplyKeyboardMarkup
 import asyncio
 
+# ==== Фейковый сервер для Render ====
+def run_fake_server():
+    server = HTTPServer(("0.0.0.0", 10000), SimpleHTTPRequestHandler)
+    server.serve_forever()
+
+threading.Thread(target=run_fake_server, daemon=True).start()
+
 # ==== Настройки ====
-SLEEP_START = 22  # с 22:00
-SLEEP_END = 8     # до 08:00
+SLEEP_START = 22
+SLEEP_END = 8
 NIGHT_LOG_FILE = "night_contacts.txt"
 
-# ==== Данные авторизации ====
+# ==== Авторизация ====
 api_id = int(os.environ.get("API_ID"))
 api_hash = os.environ.get("API_HASH")
 bot_token = os.environ.get("BOT_TOKEN")
 
 app = Client("nedvizh247_bot", api_id=api_id, api_hash=api_hash, bot_token=bot_token)
 
-# Главное меню
 main_menu = ReplyKeyboardMarkup(
     keyboard=[
         ["🏠 Хочу купить", "📤 Хочу продать"]
@@ -25,12 +33,10 @@ main_menu = ReplyKeyboardMarkup(
     one_time_keyboard=True
 )
 
-# ==== Проверка, ночь ли сейчас ====
 def is_night_time():
     now = datetime.datetime.now().time()
     return now.hour >= SLEEP_START or now.hour < SLEEP_END
 
-# ==== Логирование ночного пользователя ====
 def log_night_user(user):
     if not user:
         return
@@ -39,17 +45,13 @@ def log_night_user(user):
     name = user.first_name or "без имени"
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     line = f"{user_id} | @{username} | {name} | {now} | reminder_sent: False\n"
-
-    # Проверка: если уже есть такой ID — не записывать снова
     if os.path.exists(NIGHT_LOG_FILE):
         with open(NIGHT_LOG_FILE, "r", encoding="utf-8") as file:
             if str(user_id) in file.read():
                 return
-
     with open(NIGHT_LOG_FILE, "a", encoding="utf-8") as file:
         file.write(line)
 
-# ==== Утреннее напоминание ====
 async def send_reminders():
     if not os.path.exists(NIGHT_LOG_FILE):
         return
@@ -68,7 +70,6 @@ async def send_reminders():
         with open(NIGHT_LOG_FILE, "w", encoding="utf-8") as file:
             file.writelines(updated_lines)
 
-# ==== Планировщик запуска утреннего напоминания (один раз при старте) ====
 @app.on_message(filters.command("start"))
 async def start(client, message):
     await send_reminders()
