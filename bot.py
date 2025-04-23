@@ -4,8 +4,7 @@ import threading
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 from pyrogram import Client, filters
 from pyrogram.types import ReplyKeyboardMarkup
-import asyncio
-import pytz  # Добавили pytz
+import pytz
 
 # ==== Фейковый сервер для Render ====
 def run_fake_server():
@@ -59,19 +58,18 @@ async def send_reminders():
     if not os.path.exists(NIGHT_LOG_FILE):
         return
     updated_lines = []
-    async with app:
-        with open(NIGHT_LOG_FILE, "r", encoding="utf-8") as file:
-            for line in file.readlines():
-                if "reminder_sent: False" in line:
-                    try:
-                        user_id = int(line.split("|")[0].strip())
-                        await app.send_message(user_id, "🌞 Доброе утро! Вы писали нам ночью. Готовы продолжить?")
-                        line = line.replace("reminder_sent: False", "reminder_sent: True")
-                    except Exception as e:
-                        print(f"Не удалось отправить напоминание пользователю {user_id}: {e}")
-                updated_lines.append(line)
-        with open(NIGHT_LOG_FILE, "w", encoding="utf-8") as file:
-            file.writelines(updated_lines)
+    with open(NIGHT_LOG_FILE, "r", encoding="utf-8") as file:
+        for line in file.readlines():
+            if "reminder_sent: False" in line:
+                try:
+                    user_id = int(line.split("|")[0].strip())
+                    await app.send_message(user_id, "🌞 Доброе утро! Вы писали нам ночью. Готовы продолжить?")
+                    line = line.replace("reminder_sent: False", "reminder_sent: True")
+                except Exception as e:
+                    print(f"Не удалось отправить напоминание пользователю {user_id}: {e}")
+            updated_lines.append(line)
+    with open(NIGHT_LOG_FILE, "w", encoding="utf-8") as file:
+        file.writelines(updated_lines)
 
 @app.on_message(filters.command("start"))
 async def start(client, message):
