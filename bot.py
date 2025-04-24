@@ -5,6 +5,8 @@ from http.server import SimpleHTTPRequestHandler, HTTPServer
 from pyrogram import Client, filters
 from pyrogram.types import ReplyKeyboardMarkup
 import pytz
+import time
+import requests
 
 # ==== Фейковый сервер для Render ====
 def run_fake_server():
@@ -12,6 +14,20 @@ def run_fake_server():
     server.serve_forever()
 
 threading.Thread(target=run_fake_server, daemon=True).start()
+
+# ==== Автопинг, чтобы Render не усыплял ====
+def keep_alive():
+    def ping():
+        while True:
+            try:
+                requests.get("http://127.0.0.1:10000")
+            except Exception as e:
+                print(f"Ping error: {e}")
+            time.sleep(1500)  # Каждые 25 минут
+
+    threading.Thread(target=ping, daemon=True).start()
+
+keep_alive()
 
 # ==== Настройки ====
 SLEEP_START = 22
