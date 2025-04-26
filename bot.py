@@ -51,7 +51,7 @@ main_menu = ReplyKeyboardMarkup(
     one_time_keyboard=True
 )
 
-admin_user_id = 794970371  # 🔥 Здесь укажи свой Telegram ID (без восьмёрки в начале)
+admin_user_id = 794970371  # 🔥 Твой Telegram user_id
 
 # ==== Вспомогательные функции ====
 def is_night_time():
@@ -60,15 +60,23 @@ def is_night_time():
 
 async def send_morning_summary():
     now = datetime.datetime.now(moscow)
-    if now.hour == SLEEP_END and night_users:
-        text = "🌙 Ночные заявки:\n\n"
-        for user in night_users:
-            text += f"• {user['name']} (@{user['username']}) в {user['time']}\n"
-        try:
-            await app.send_message(admin_user_id, text)
-        except Exception as e:
-            print(f"Ошибка отправки ночного отчёта: {e}")
-        night_users.clear()
+    if now.hour == SLEEP_END:
+        print("Проверка утреннего отчета: наступило 8:00 по Москве")
+        if night_users:
+            text = "🌙 Ночные заявки:\n\n"
+            for user in night_users:
+                text += f"• {user['name']} (@{user['username']}) в {user['time']}\n"
+            try:
+                await app.send_message(admin_user_id, text)
+            except Exception as e:
+                print(f"Ошибка отправки ночного отчёта: {e}")
+            night_users.clear()
+        else:
+            # Даже если нет ночных заявок, отправляем сообщение
+            try:
+                await app.send_message(admin_user_id, "🌅 Ночных заявок не поступало.")
+            except Exception as e:
+                print(f"Ошибка отправки пустого отчёта: {e}")
 
 def log_night_user(user):
     if not user:
