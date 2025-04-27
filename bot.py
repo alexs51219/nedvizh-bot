@@ -10,7 +10,7 @@ import os
 API_ID = 28155507
 API_HASH = "cce39d7743018b7c5b2047757ce85eee"
 BOT_TOKEN = "7949703718:AAH43G5ZyQ_vDxRD3LG6sUFz09rOPkfvXGA"
-ADMIN_ID = 805696670  # <-- Вставил твой Telegram ID!
+ADMIN_ID = 805696670
 
 # Время для работы бота
 TIMEZONE = pytz.timezone('Europe/Moscow')
@@ -79,7 +79,6 @@ def start_scheduler():
     now = datetime.now(TIMEZONE)
     current_hour = now.hour
 
-    # Время пробуждения 08:00
     if 8 <= current_hour < 22:
         scheduler.add_job(send_reminders, "interval", minutes=120)
     else:
@@ -88,20 +87,55 @@ def start_scheduler():
     scheduler.start()
 
 async def send_reminders():
-    pass  # Здесь твои напоминания если надо
+    pass
 
 async def sleep_mode():
-    pass  # Спящий режим
+    pass
 
-# Обработка команд
+# Словарь для хранения анкет пользователей
+user_forms = {}
+
+# Старт анкеты
+@app.on_message(filters.regex("🏠 Хочу купить"))
+async def start_buy_form(client, message):
+    user_id = message.from_user.id
+    user_forms[user_id] = {"stage": "property_type"}
+
+    await message.reply(
+        "Что хотите купить? 🏠\n\n"
+        "Выберите один из вариантов или напишите свой вариант ✏️",
+        reply_markup=ReplyKeyboardMarkup(
+            [
+                ["Квартира (Вторичная недвижимость)", "Квартира (Новостройка)"],
+                ["Дом", "Дача"],
+                ["Земельный участок", "Другое"]
+            ],
+            resize_keyboard=True
+        )
+    )
+
+# Обработка всех текстовых сообщений
+@app.on_message(filters.text & ~filters.command("start"))
+async def handle_form(client, message):
+    user_id = message.from_user.id
+
+    if user_id not in user_forms:
+        return  # Игнорируем сообщения не из анкеты
+
+    stage = user_forms[user_id]["stage"]
+    text = message.text
+
+    if stage == "property_type":
+        user_forms[user_id]["property_type"] = text
+        user_forms[user_id]["stage"] = "next_stage"  # Пока заготовка для следующего шага
+
+        await message.reply("Отлично! 📝 (Следующий вопрос скоро будет подключён.)")
+
+# Обработка команды старт
 @app.on_message(filters.command("start"))
 async def start(client, message):
     await message.reply(WELCOME_TEXT, reply_markup=menu)
     await morning_tasks()
-
-@app.on_message(filters.regex("🏠 Хочу купить"))
-async def buy(client, message):
-    await message.reply("🏠 Отлично! Сейчас поможем подобрать недвижимость.\n(Анкета скоро будет подключена!)")
 
 @app.on_message(filters.regex("📤 Хочу продать"))
 async def sell(client, message):
