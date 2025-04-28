@@ -1,15 +1,14 @@
 from pyrogram import Client, filters
 from pyrogram.types import ReplyKeyboardMarkup
 
-# --- Старт бота ---
 app = Client(
     "nedvizh_bot",
-    bot_token="ТВОЙ_ТОКЕН",
+    bot_token="7949703718:AAH43G5ZyQ_vDxRD3LG6sUFz09rOPkfvXGA",
     api_id=28155507,
     api_hash="cce39d7743018b7c5b2047757ce85eee"
 )
 
-# --- Приветствие / старт ---
+# --- Приветствие ---
 @app.on_message(filters.command("start"))
 async def start(client, message):
     await message.reply(
@@ -23,7 +22,7 @@ async def start(client, message):
         )
     )
 
-# --- Выбор типа покупки ---
+# --- Выбор что купить ---
 @app.on_message(filters.regex("🏠 Хочу купить"))
 async def want_to_buy(client, message):
     await message.reply(
@@ -40,7 +39,7 @@ async def want_to_buy(client, message):
     )
 
 # --- Выбор типа квартиры ---
-@app.on_message(filters.text(["🏢 Квартира (Новостройка)", "🏘️ Квартира (Вторичная недвижимость)"]))
+@app.on_message(filters.regex("🏢 Квартира \\(Новостройка\\)|🏘️ Квартира \\(Вторичная недвижимость\\)"))
 async def choose_flat_type(client, message):
     if message.text == "🏢 Квартира (Новостройка)":
         await message.reply(
@@ -69,7 +68,7 @@ async def choose_flat_type(client, message):
             )
         )
 
-# --- НОВЫЙ БЛОК: Площадь квартиры ---
+# --- Площадь квартиры ---
 @app.on_message(filters.text(["Студия", "1к (Е-2)", "2к (Е-3)", "3к (Е-4)", "1-комнатная", "2-комнатная", "3-комнатная", "4-комнатная", "5-комнатная"]))
 async def ask_flat_area(client, message):
     await message.reply(
