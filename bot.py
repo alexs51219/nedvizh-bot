@@ -1,92 +1,96 @@
-from pyrogram import Client, filters
-from pyrogram.types import ReplyKeyboardMarkup
 import asyncio
+from pyrogram import Client, filters
+from pyrogram.types import ReplyKeyboardMarkup, Message
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from datetime import datetime
-import pytz
-import os
+from datetime import datetime, time
 
-API_ID = int(os.getenv("API_ID"))
-API_HASH = os.getenv("API_HASH")
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = 805696670
+# Настройки
+API_ID = 12345678  # ← замени на свой API_ID
+API_HASH = "your_api_hash_here"  # ← замени на свой API_HASH
+BOT_TOKEN = "your_bot_token_here"  # ← замени на свой BOT_TOKEN
+ADMIN_ID = 805696670  # ← твой Telegram ID
 
-app = Client("bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+app = Client("nedvizh_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+scheduler = AsyncIOScheduler()
 
-main_keyboard = ReplyKeyboardMarkup(
-    keyboard=[
-        ["🏠 Хочу купить", "🏘️ Хочу продать"],
-        ["ℹ️ Обо мне"]
-    ],
-    resize_keyboard=True
-)
+# --- Команды ---
 
-buy_keyboard = ReplyKeyboardMarkup(
-    keyboard=[
-        ["🏢 Квартира (Новостройка)", "🏘️ Квартира (Вторичная недвижимость)"],
-        ["🏠 Дом", "🌿 Дача/Участок"],
-        ["⬅️ Назад в меню"]
-    ],
-    resize_keyboard=True
-)
-
-apartment_keyboard = ReplyKeyboardMarkup(
-    keyboard=[
-        ["Студия", "1к (Е-2)", "2к (Е-3)", "3к (Е-4)"],
-        ["1-комнатная", "2-комнатная", "3-комнатная", "4-комнатная", "5-комнатная"],
-        ["⬅️ Назад в меню"]
-    ],
-    resize_keyboard=True
-)
-
+# Старт
 @app.on_message(filters.command("start"))
-async def start(client, message):
-    await message.reply_text(
-        "👋 Добро пожаловать в бот брокера Александра Суслова \"Недвижимость Тулы 24/7\"!\n\n"
-        "Готов помочь с недвижимостью Тулы. Вы мечтаете — Я воплощаю! 💫",
-        reply_markup=main_keyboard
+async def start(client, message: Message):
+    keyboard = ReplyKeyboardMarkup(
+        [["🏠 Хочу купить", "📤 Хочу продать"],
+         ["ℹ️ Обо мне"]],
+        resize_keyboard=True
+    )
+    await message.reply(
+        "Добро пожаловать в бот «Недвижимость Тулы 24/7»!\n\nВыберите нужный пункт меню:",
+        reply_markup=keyboard
     )
 
-@app.on_message(filters.create(lambda _, m: m.text == "🏠 Хочу купить"))
-async def buy(client, message):
-    await message.reply_text("Что хотите купить?", reply_markup=buy_keyboard)
-
-@app.on_message(filters.create(lambda _, m: m.text in ["🏢 Квартира (Новостройка)", "🏘️ Квартира (Вторичная недвижимость)"]))
-async def choose_apartment(client, message):
-    await message.reply_text("Выберите тип квартиры:", reply_markup=apartment_keyboard)
-
-@app.on_message(filters.create(lambda _, m: m.text == "⬅️ Назад в меню"))
-async def back(client, message):
-    await message.reply_text("Вы вернулись в главное меню.", reply_markup=main_keyboard)
-
-@app.on_message(filters.create(lambda _, m: m.text == "ℹ️ Обо мне"))
-async def about(client, message):
-    await message.reply_text(
-        "👨‍💼 Александр Суслов\n"
-        "📍 Специалист по недвижимости в Туле\n"
-        "📱 [Связаться со мной](https://tapy.me/upfyk8)",
-        disable_web_page_preview=True
+# Обо мне
+@app.on_message(filters.text(["ℹ️ Обо мне"]))
+async def about(client, message: Message):
+    await message.reply(
+        "Этот бот помогает быстро подобрать или продать недвижимость в Туле.\n"
+        "🏡 Квартиры, дома, участки\n"
+        "📞 Мы свяжемся с вами после заявки."
     )
 
-# ----------- Ночная проверка -----------
+# Хочу купить
+@app.on_message(filters.text("🏠 Хочу купить"))
+async def want_to_buy(client, message: Message):
+    keyboard = ReplyKeyboardMarkup(
+        [["🏢 Квартира (Новостройка)", "🏘️ Квартира (Вторичная недвижимость)"],
+         ["🏡 Дом", "🌳 Участок/Дача"],
+         ["🔙 Назад в меню"]],
+        resize_keyboard=True
+    )
+    await message.reply("Что вы хотите купить?", reply_markup=keyboard)
 
-async def check_night_messages():
-    moscow = pytz.timezone("Europe/Moscow")
-    now = datetime.now(moscow)
-    if 8 <= now.hour < 22:
-        return  # Утро-день, не работаем
+# Назад в меню
+@app.on_message(filters.text("🔙 Назад в меню"))
+async def back_to_menu(client, message: Message):
+    keyboard = ReplyKeyboardMarkup(
+        [["🏠 Хочу купить", "📤 Хочу продать"],
+         ["ℹ️ Обо мне"]],
+        resize_keyboard=True
+    )
+    await message.reply("Возврат в главное меню:", reply_markup=keyboard)
 
-    await app.send_message(ADMIN_ID, "🛏️ Ночной режим: бот активен.")
+# Новостройка
+@app.on_message(filters.text("🏢 Квартира (Новостройка)"))
+async def new_building(client, message: Message):
+    keyboard = ReplyKeyboardMarkup(
+        [["Студия", "1к (Е-2)", "2к (Е-3)", "3к (Е-4)", "Другое"],
+         ["🔙 Назад в меню"]],
+        resize_keyboard=True
+    )
+    await message.reply("Выберите тип квартиры (Новостройка):", reply_markup=keyboard)
 
-# ----------- Основной запуск -----------
+# Вторичная недвижимость
+@app.on_message(filters.text("🏘️ Квартира (Вторичная недвижимость)"))
+async def secondary(client, message: Message):
+    keyboard = ReplyKeyboardMarkup(
+        [["1-комнатная", "2-комнатная", "3-комнатная", "4-комнатная", "5-комнатная"],
+         ["Другое", "🔙 Назад в меню"]],
+        resize_keyboard=True
+    )
+    await message.reply("Выберите тип квартиры (Вторичка):", reply_markup=keyboard)
 
+# Фоновая задача — сообщение утром
+async def morning_report():
+    now = datetime.now()
+    if now.time() >= time(8, 0):
+        await app.send_message(ADMIN_ID, "☀️ Бот проснулся. Готов к приёму заявок!")
+
+# Запуск
 async def main():
-    scheduler = AsyncIOScheduler()
-    scheduler.add_job(check_night_messages, "interval", hours=1)
+    scheduler.add_job(morning_report, "cron", hour=8, minute=0)
     scheduler.start()
     await app.start()
-    await idle()
-    await app.stop()
+    print("Бот запущен.")
+    await asyncio.get_event_loop().create_future()  # бесконечное ожидание
 
-from pyrogram.idle import idle
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())
