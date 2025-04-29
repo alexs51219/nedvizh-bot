@@ -1,108 +1,129 @@
-from pyrogram import Client, filters
-from pyrogram.types import ReplyKeyboardMarkup
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from datetime import datetime
-import pytz
 import asyncio
+import logging
+from pyrogram import Client, filters
+from pyrogram.types import ReplyKeyboardMarkup, KeyboardButton
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+import pytz
+from datetime import datetime
 import os
 
-# Данные для подключения
-API_ID = 28155507
-API_HASH = "cce39d7743018b7c5b2047757ce85eee"
-BOT_TOKEN = "7949703718:AAH43G5ZyQ_vDxRD3LG6sUFz09rOPkfvXGA"
-ADMIN_ID = 805696670
+API_ID = 12345678  # <-- твой настоящий API_ID
+API_HASH = "your_api_hash"  # <-- твой настоящий API_HASH
+BOT_TOKEN = "your_bot_token"  # <-- твой настоящий BOT_TOKEN
+ADMIN_ID = 805696670  # <-- твой Telegram ID (ты присылал!)
 
-app = Client("nedvizh_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+app = Client("my_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-# Главное меню
-menu = ReplyKeyboardMarkup(
-    keyboard=[
-        ["🏠 Хочу купить", "🏡 Хочу продать"],
-        ["ℹ️ Обо мне"]
-    ],
-    resize_keyboard=True
-)
+logging.basicConfig(level=logging.INFO)
 
-# Стартовое сообщение
+# Путь для сохранения ночных заявок
+NIGHT_REQUESTS_FILE = "night_requests.txt"
+
+# Таймзона
+tz = pytz.timezone('Europe/Moscow')
+
+# Время работы
+WORK_START = 8
+WORK_END = 22
+
+# Команда /start
 @app.on_message(filters.command("start"))
 async def start(client, message):
     await message.reply(
         "👋 Добро пожаловать в бот брокера (специалиста по недвижимости) Александра Суслова \"Недвижимость Тулы 24/7\"!\n\n"
-        "Готов помочь с недвижимостью Тулы.\n"
-        "Вы мечтаете — Я воплощаю! 💫\n\n"
-        "Выберите, пожалуйста, действие ниже ⬇️",
-        reply_markup=menu
+        "Готов помочь с недвижимостью Тулы. Вы мечтаете — Я воплощаю! 💫",
+        reply_markup=ReplyKeyboardMarkup(
+            [
+                [KeyboardButton("🏠 Хочу купить"), KeyboardButton("🏡 Хочу продать")],
+                [KeyboardButton("ℹ️ Обо мне")]
+            ],
+            resize_keyboard=True
+        )
     )
 
-# Ответ на кнопку "Обо мне"
-@app.on_message(filters.text("ℹ️ Обо мне"))
+# Кнопка "Обо мне"
+@app.on_message(filters.text(["ℹ️ Обо мне"]))
 async def about(client, message):
-    await message.reply("🔗 Подробнее обо мне: https://tapy.me/upfyk8")
+    await message.reply("🔗 Подробнее: https://tapy.me/upfyk8")
 
-# Спящий режим
-tz = pytz.timezone('Europe/Moscow')
+# Кнопка "Хочу купить"
+@app.on_message(filters.text("🏠 Хочу купить"))
+async def buy(client, message):
+    await message.reply(
+        "Выберите, что хотите купить:",
+        reply_markup=ReplyKeyboardMarkup(
+            [
+                [KeyboardButton("🏢 Квартира (Новостройка)"), KeyboardButton("🏘️ Квартира (Вторичная недвижимость)")],
+                [KeyboardButton("🏠 Дом / Дача"), KeyboardButton("🌳 Земельный участок")],
+                [KeyboardButton("↩️ Назад в меню")]
+            ],
+            resize_keyboard=True
+        )
+    )
 
-async def is_sleep_time():
-    now = datetime.now(tz)
-    return now.hour >= 22 or now.hour < 8
+# Кнопка "Хочу продать"
+@app.on_message(filters.text("🏡 Хочу продать"))
+async def sell(client, message):
+    await message.reply("💬 Напишите, что хотите продать, и я с вами свяжусь!")
 
-# Ответы на кнопки "Хочу купить" и "Хочу продать"
-@app.on_message(filters.text(["🏠 Хочу купить", "🏡 Хочу продать"]))
-async def handle_menu(client, message):
-    if await is_sleep_time():
-        await message.reply("😴 Бот спит с 22:00 до 08:00. Ваша заявка будет обработана утром!")
-        save_night_request(message)
+# Кнопка "Назад в меню"
+@app.on_message(filters.text("↩️ Назад в меню"))
+async def back_to_menu(client, message):
+    await start(client, message)
+
+# Обработка выбора квартир
+@app.on_message(filters.text(["🏢 Квартира (Новостройка)", "🏘️ Квартира (Вторичная недвижимость)"]))
+async def select_apartment_type(client, message):
+    if message.text == "🏢 Квартира (Новостройка)":
+        await message.reply(
+            "Выберите тип квартиры в новостройке:",
+            reply_markup=ReplyKeyboardMarkup(
+                [
+                    [KeyboardButton("Студия"), KeyboardButton("1к (Е-2)")],
+                    [KeyboardButton("2к (Е-3)"), KeyboardButton("3к (Е-4)")],
+                    [KeyboardButton("Другое"), KeyboardButton("↩️ Назад в меню")]
+                ],
+                resize_keyboard=True
+            )
+        )
     else:
-        if message.text == "🏠 Хочу купить":
-            await message.reply(
-                "Что именно хотите купить?",
-                reply_markup=ReplyKeyboardMarkup(
-                    keyboard=[
-                        ["🏢 Квартира (Новостройка)", "🏘️ Квартира (Вторичная недвижимость)"],
-                        ["🏠 Дом", "🏡 Дача", "🌿 Земельный участок"],
-                        ["🏡 Другое", "⬅️ Назад в меню"]
-                    ],
-                    resize_keyboard=True
-                )
+        await message.reply(
+            "Выберите тип квартиры на вторичном рынке:",
+            reply_markup=ReplyKeyboardMarkup(
+                [
+                    [KeyboardButton("1-комнатная"), KeyboardButton("2-комнатная")],
+                    [KeyboardButton("3-комнатная"), KeyboardButton("4-комнатная")],
+                    [KeyboardButton("5-комнатная"), KeyboardButton("Другое")],
+                    [KeyboardButton("↩️ Назад в меню")]
+                ],
+                resize_keyboard=True
             )
-        elif message.text == "🏡 Хочу продать":
-            await message.reply(
-                "Что именно хотите продать?",
-                reply_markup=ReplyKeyboardMarkup(
-                    keyboard=[
-                        ["🏢 Квартира (Новостройка)", "🏘️ Квартира (Вторичная недвижимость)"],
-                        ["🏠 Дом", "🏡 Дача", "🌿 Земельный участок"],
-                        ["🏡 Другое", "⬅️ Назад в меню"]
-                    ],
-                    resize_keyboard=True
-                )
-            )
+        )
 
-# Обработка кнопки "Назад в меню"
-@app.on_message(filters.text("⬅️ Назад в меню"))
-async def back_to_main_menu(client, message):
-    await message.reply("Вы вернулись в главное меню.", reply_markup=menu)
+# Отправка сообщения ночью
+@app.on_message(filters.private & ~filters.command(["start"]))
+async def handle_message(client, message):
+    now = datetime.now(tz)
+    if WORK_START <= now.hour < WORK_END:
+        pass  # Бот работает нормально
+    else:
+        # Сохраняем ночную заявку
+        with open(NIGHT_REQUESTS_FILE, "a", encoding="utf-8") as file:
+            file.write(f"{datetime.now(tz)} — {message.from_user.first_name} (@{message.from_user.username}) — {message.text}\n")
+        await message.reply("Бот сейчас отдыхает. 💤 Я обязательно свяжусь с вами утром!")
 
-# Сохраняем ночные заявки
-def save_night_request(message):
-    with open("night_requests.txt", "a", encoding="utf-8") as f:
-        f.write(f"{datetime.now(tz).strftime('%d.%m.%Y %H:%M:%S')} - {message.from_user.id} - {message.text}\n")
-
-# Утренняя отправка списка ночных заявок
-async def send_morning_report():
-    if os.path.exists("night_requests.txt"):
-        with open("night_requests.txt", "r", encoding="utf-8") as f:
-            requests = f.read()
+# Ежедневная проверка ночных заявок
+async def send_night_requests():
+    if os.path.exists(NIGHT_REQUESTS_FILE):
+        with open(NIGHT_REQUESTS_FILE, "r", encoding="utf-8") as file:
+            requests = file.read()
         if requests:
-            await app.send_message(ADMIN_ID, f"🌅 Ночные заявки:\n\n{requests}")
-            open("night_requests.txt", "w", encoding="utf-8").close()
+            await app.send_message(ADMIN_ID, f"🌙 Ночные обращения:\n\n{requests}")
+        os.remove(NIGHT_REQUESTS_FILE)
 
-# Планировщик для утреннего отчёта
 scheduler = AsyncIOScheduler()
-
-scheduler.add_job(send_morning_report, "cron", hour=8, minute=0, timezone=tz)
-
+scheduler.add_job(send_night_requests, "cron", hour=WORK_START, minute=0, timezone=tz)
 scheduler.start()
 
-# Запуск
+print("Бот запущен...")
 app.run()
