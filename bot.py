@@ -49,17 +49,18 @@ async def start(client, message):
         reply_markup=keyboard
     )
 
-@app.on_message(filters.text("ℹ️ Обо мне"))
+# ✅ Исправлено: фильтр на обычный текст
+@app.on_message(filters.text)
 async def about_me(client, message):
-    await message.reply("🔗 Мои контакты: https://tapy.me/upfyk8")
+    if message.text == "ℹ️ Обо мне":
+        await message.reply("🔗 Мои контакты: https://tapy.me/upfyk8")
 
 # 🏠 Анкета: Хочу купить
-@app.on_message(filters.text("🏠 Хочу купить"))
+@app.on_message(filters.text & filters.regex("🏠 Хочу купить"))
 async def start_purchase(client, message):
     user_id = message.from_user.id
     user_data[user_id] = {}
     
-    # Вопрос 1: тип недвижимости
     reply_markup = ReplyKeyboardMarkup(
         [
             ["Квартира", "Дом"],
@@ -84,7 +85,7 @@ async def handle_property_type(message):
     else:
         await message.reply("🏗️ Следующие шаги для выбранного типа скоро появятся.")
 
-# (Следующие шаги анкеты — добавим в следующей части)
+# 📌 (следующий шаг — handle_flat_category — добавим дальше)
 
 # ▶️ Запуск бота
 app.run()
